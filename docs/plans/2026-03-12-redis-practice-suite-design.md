@@ -1,0 +1,159 @@
+# Redis Practice Suite Design
+
+**Date:** 2026-03-12
+
+## Goal
+
+Provide three completely independent Spring Boot practice projects for Redis learning:
+
+1. `redis-product-cache-demo`: use Redis as a product cache
+2. `redis-login-token-demo`: use Redis to store login token sessions
+3. `redis-order-lock-demo`: use Redis distributed lock to prevent duplicate order submission
+
+The target reader is a beginner who needs Chinese Markdown documents and can follow the documents to build each project step by step.
+
+## Why These Three Scenarios
+
+These three scenarios cover the most common Redis directions in production:
+
+- cache
+- session/token
+- lock / duplicate-submit protection
+
+Together they let a beginner see Redis from three different angles instead of learning only "set/get".
+
+## Why Three Independent Projects
+
+The user asked to keep the same delivery style as the MQ documents. Therefore:
+
+- each Redis scenario is a standalone Spring Boot project
+- each project has its own Docker Compose file
+- each project has its own application port
+- each project can be learned, restarted, and deleted independently
+
+## Unified Technical Direction
+
+- Java 17
+- Spring Boot 3.2.5
+- Spring Web
+- Spring Data Redis
+- MyBatis-Plus Boot 3 starter
+- MySQL 8.0 in Docker when relational data is needed
+- Redis 7.2 in Docker
+- Maven build
+
+## Production-Style Redis Scenarios
+
+### 1. Product Cache
+
+Production meaning:
+
+- hot product data is read frequently
+- database pressure can be reduced through Redis cache
+- update flow usually needs cache invalidation
+
+Practice target:
+
+- query product by cache-aside
+- write product changes to MySQL
+- delete cache after update
+
+### 2. Login Token Session
+
+Production meaning:
+
+- user session state is often stored in Redis
+- TTL can automatically expire login state
+- logout and token validation become simple key operations
+
+Practice target:
+
+- login with username and password
+- generate a token
+- store token session in Redis with TTL
+- query current login user by token
+- delete token on logout
+
+### 3. Distributed Lock For Duplicate Submission
+
+Production meaning:
+
+- repeated clicks or concurrent requests can create duplicate orders
+- Redis `SETNX + EXPIRE` style lock is a common beginner entry point
+- unlock safety must be explained carefully
+
+Practice target:
+
+- acquire a short-lived Redis lock before order creation
+- reject repeated submits when the lock already exists
+- release the lock safely after the business completes
+
+## Scope
+
+Included:
+
+- three standalone Spring Boot projects
+- one detailed Markdown implementation guide per project
+- Docker startup steps
+- full file creation order
+- complete code blocks with detailed comments
+- API test commands and expected results
+- troubleshooting notes
+
+Excluded:
+
+- Redis cluster
+- Lua-heavy advanced scripts except minimal unlock script
+- Redisson
+- cache avalanche/breakdown full mitigation set
+- pub/sub and stream
+- production observability and alerting
+
+## Port Strategy
+
+To avoid conflicts on one machine, each project uses a separate port group.
+
+- `redis-product-cache-demo`
+  - app: `8091`
+  - mysql: `3310`
+  - redis: `6380`
+- `redis-login-token-demo`
+  - app: `8092`
+  - mysql: `3311`
+  - redis: `6381`
+- `redis-order-lock-demo`
+  - app: `8093`
+  - mysql: `3312`
+  - redis: `6382`
+
+## Document Deliverables
+
+The following implementation documents will be created:
+
+- `docs/plans/2026-03-12-redis-product-cache-demo.md`
+- `docs/plans/2026-03-12-redis-login-token-demo.md`
+- `docs/plans/2026-03-12-redis-order-lock-demo.md`
+
+Each document contains:
+
+- scenario explanation
+- final directory structure
+- Docker Compose startup
+- every file to create
+- full code with Chinese comments
+- curl test steps
+- common errors and explanations
+
+## Learning Order
+
+Recommended order:
+
+1. `redis-product-cache-demo`
+2. `redis-login-token-demo`
+3. `redis-order-lock-demo`
+
+Reason:
+
+- cache is the easiest Redis entry point
+- token session introduces TTL and key design
+- distributed lock is more advanced and benefits from learning the first two scenarios first

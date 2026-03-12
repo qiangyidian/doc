@@ -1,0 +1,666 @@
+# redis-product-cache-demo Implementation Plan
+
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+
+**Goal:** 从零创建一个独立的 Spring Boot 项目，完成“商品查询走 Redis 缓存，商品更新后删除缓存”的练习模块，让初学者理解 Redis 在生产环境里最常见的缓存用法。
+
+**Architecture:** 这个项目的核心链路是 `Controller -> Service -> Redis / MySQL`。查询时优先读 Redis，Redis 没有数据再查 MySQL，并把结果回填到 Redis；更新时先更新 MySQL，再删除 Redis 缓存，采用最常见的 Cache Aside 思路。
+
+**Tech Stack:** Java 17, Spring Boot 3.2.5, Maven, Spring Web, Spring Data Redis, MyBatis-Plus 3.5.15, MySQL 8.0, Redis 7.2, Docker Compose, Lombok, JUnit 5
+
+---
+
+## 一、这个项目在生产环境里为什么会用 Redis
+
+商品信息通常是高频读取的数据。  
+如果每一次查询都直接打到 MySQL，会带来两个问题：
+
+1. 数据库压力大
+2. 响应时间通常会比 Redis 更慢
+
+所以很常见的做法是：
+
+1. 先查 Redis
+2. Redis 没有时再查 MySQL
+3. 把 MySQL 的结果重新写回 Redis
+
+当商品价格更新时：
+
+1. 先更新 MySQL
+2. 再删除 Redis 中的旧缓存
+
+这是非常经典的 `Cache Aside` 模式。
+
+---
+
+## 二、最终目录结构
+
+```text
+redis-product-cache-demo
+├── docker-compose.yml
+├── pom.xml
+├── src
+│   ├── main
+│   │   ├── java/com/example/productcache
+│   │   │   ├── ProductCacheApplication.java
+│   │   │   ├── common
+│   │   │   │   ├── Constants.java
+│   │   │   │   └── Result.java
+│   │   │   ├── controller
+│   │   │   │   └── ProductController.java
+│   │   │   ├── dto
+│   │   │   │   └── UpdatePriceRequest.java
+│   │   │   ├── entity
+│   │   │   │   └── ProductInfo.java
+│   │   │   ├── mapper
+│   │   │   │   └── ProductInfoMapper.java
+│   │   │   └── service
+│   │   │       ├── ProductService.java
+│   │   │       └── impl
+│   │   │           └── ProductServiceImpl.java
+│   │   └── resources
+│   │       ├── application.yml
+│   │       ├── data.sql
+│   │       └── schema.sql
+│   └── test
+│       └── java/com/example/productcache/ProductCacheApplicationTests.java
+```
+
+---
+
+## 三、端口规划
+
+- 应用端口：`8091`
+- MySQL：`3310`
+- Redis：`6380`
+
+---
+
+### Task 1: 创建项目骨架和 Docker 环境
+
+**Files:**
+- Create: `pom.xml`
+- Create: `docker-compose.yml`
+- Create: `src/main/java/com/example/productcache/ProductCacheApplication.java`
+- Create: `src/main/resources/application.yml`
+- Create: `src/main/resources/schema.sql`
+- Create: `src/main/resources/data.sql`
+- Test: `src/test/java/com/example/productcache/ProductCacheApplicationTests.java`
+
+**Step 1: 创建 `pom.xml`**
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.5</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>redis-product-cache-demo</artifactId>
+    <version>1.0.0</version>
+
+    <properties>
+        <java.version>17</java.version>
+        <mybatis-plus.version>3.5.15</mybatis-plus.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+**Step 2: 创建 `docker-compose.yml`**
+
+```yaml
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: redis-product-cache-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: product_cache_db
+    ports:
+      - "3310:3306"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - redis-product-cache-mysql-data:/var/lib/mysql
+
+  redis:
+    image: redis:7.2
+    container_name: redis-product-cache-redis
+    restart: always
+    ports:
+      - "6380:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-product-cache-redis-data:/data
+
+volumes:
+  redis-product-cache-mysql-data:
+  redis-product-cache-redis-data:
+```
+
+**Step 3: 创建启动类 `ProductCacheApplication.java`**
+
+```java
+package com.example.productcache;
+
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+@MapperScan("com.example.productcache.mapper")
+public class ProductCacheApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(ProductCacheApplication.class, args);
+    }
+}
+```
+
+**Step 4: 创建 `application.yml`**
+
+```yaml
+server:
+  port: 8091
+
+spring:
+  application:
+    name: redis-product-cache-demo
+
+  datasource:
+    url: jdbc:mysql://localhost:3310/product_cache_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  data:
+    redis:
+      host: localhost
+      port: 6380
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+      data-locations: classpath:data.sql
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+```
+
+**Step 5: 创建 `schema.sql`**
+
+```sql
+DROP TABLE IF EXISTS t_product_info;
+
+CREATE TABLE t_product_info (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID',
+    product_name VARCHAR(100) NOT NULL COMMENT '商品名称',
+    price DECIMAL(10, 2) NOT NULL COMMENT '商品价格',
+    stock_count INT NOT NULL COMMENT '库存数量',
+    create_time DATETIME NOT NULL COMMENT '创建时间',
+    update_time DATETIME NOT NULL COMMENT '更新时间'
+);
+```
+
+**Step 6: 创建 `data.sql`**
+
+```sql
+INSERT INTO t_product_info (product_name, price, stock_count, create_time, update_time)
+VALUES ('Redis实战课', 199.00, 100, NOW(), NOW()),
+       ('SpringBoot进阶课', 299.00, 50, NOW(), NOW());
+```
+
+**Step 7: 创建测试类 `ProductCacheApplicationTests.java`**
+
+```java
+package com.example.productcache;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class ProductCacheApplicationTests {
+
+    @Test
+    void contextLoads() {
+    }
+}
+```
+
+---
+
+### Task 2: 创建通用类、实体类、Mapper 和 DTO
+
+**Files:**
+- Create: `src/main/java/com/example/productcache/common/Constants.java`
+- Create: `src/main/java/com/example/productcache/common/Result.java`
+- Create: `src/main/java/com/example/productcache/entity/ProductInfo.java`
+- Create: `src/main/java/com/example/productcache/mapper/ProductInfoMapper.java`
+- Create: `src/main/java/com/example/productcache/dto/UpdatePriceRequest.java`
+
+**Step 1: 创建 `Constants.java`**
+
+```java
+package com.example.productcache.common;
+
+public final class Constants {
+
+    private Constants() {
+    }
+
+    /**
+     * Redis 中商品缓存 key 的前缀。
+     * 最终 key 形如：product:info:1
+     */
+    public static final String PRODUCT_CACHE_KEY_PREFIX = "product:info:";
+}
+```
+
+**Step 2: 创建 `Result.java`**
+
+```java
+package com.example.productcache.common;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class Result<T> {
+
+    private Integer code;
+    private String message;
+    private T data;
+
+    public static <T> Result<T> success(T data) {
+        return new Result<>(200, "success", data);
+    }
+}
+```
+
+**Step 3: 创建实体类 `ProductInfo.java`**
+
+```java
+package com.example.productcache.entity;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Data
+@TableName("t_product_info")
+public class ProductInfo {
+
+    @TableId(type = IdType.AUTO)
+    private Long id;
+
+    private String productName;
+
+    private BigDecimal price;
+
+    private Integer stockCount;
+
+    private LocalDateTime createTime;
+
+    private LocalDateTime updateTime;
+}
+```
+
+**Step 4: 创建 Mapper `ProductInfoMapper.java`**
+
+```java
+package com.example.productcache.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.example.productcache.entity.ProductInfo;
+
+public interface ProductInfoMapper extends BaseMapper<ProductInfo> {
+}
+```
+
+**Step 5: 创建 DTO `UpdatePriceRequest.java`**
+
+```java
+package com.example.productcache.dto;
+
+import lombok.Data;
+
+import java.math.BigDecimal;
+
+@Data
+public class UpdatePriceRequest {
+
+    private BigDecimal price;
+}
+```
+
+---
+
+### Task 3: 创建 Service 和 Controller
+
+**Files:**
+- Create: `src/main/java/com/example/productcache/service/ProductService.java`
+- Create: `src/main/java/com/example/productcache/service/impl/ProductServiceImpl.java`
+- Create: `src/main/java/com/example/productcache/controller/ProductController.java`
+
+**Step 1: 创建 `ProductService.java`**
+
+```java
+package com.example.productcache.service;
+
+import com.example.productcache.entity.ProductInfo;
+
+import java.math.BigDecimal;
+
+public interface ProductService {
+
+    ProductInfo getProductById(Long id);
+
+    ProductInfo updatePrice(Long id, BigDecimal price);
+
+    String getRawCacheValue(Long id);
+}
+```
+
+**Step 2: 创建 `ProductServiceImpl.java`**
+
+```java
+package com.example.productcache.service.impl;
+
+import com.example.productcache.common.Constants;
+import com.example.productcache.entity.ProductInfo;
+import com.example.productcache.mapper.ProductInfoMapper;
+import com.example.productcache.service.ProductService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
+
+@Service
+public class ProductServiceImpl implements ProductService {
+
+    private final ProductInfoMapper productInfoMapper;
+    private final StringRedisTemplate stringRedisTemplate;
+    private final ObjectMapper objectMapper;
+
+    public ProductServiceImpl(ProductInfoMapper productInfoMapper,
+                              StringRedisTemplate stringRedisTemplate,
+                              ObjectMapper objectMapper) {
+        this.productInfoMapper = productInfoMapper;
+        this.stringRedisTemplate = stringRedisTemplate;
+        this.objectMapper = objectMapper;
+    }
+
+    @Override
+    public ProductInfo getProductById(Long id) {
+        String cacheKey = Constants.PRODUCT_CACHE_KEY_PREFIX + id;
+
+        // 第一步：先从 Redis 里查缓存。
+        String cacheValue = stringRedisTemplate.opsForValue().get(cacheKey);
+        if (cacheValue != null) {
+            try {
+                return objectMapper.readValue(cacheValue, ProductInfo.class);
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException("缓存反序列化失败", e);
+            }
+        }
+
+        // 第二步：Redis 没有时，再查 MySQL。
+        ProductInfo productInfo = productInfoMapper.selectById(id);
+        if (productInfo == null) {
+            return null;
+        }
+
+        // 第三步：把 MySQL 查询结果回填到 Redis，并设置 TTL。
+        try {
+            stringRedisTemplate.opsForValue().set(
+                    cacheKey,
+                    objectMapper.writeValueAsString(productInfo),
+                    30,
+                    TimeUnit.MINUTES
+            );
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("缓存序列化失败", e);
+        }
+
+        return productInfo;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ProductInfo updatePrice(Long id, BigDecimal price) {
+        ProductInfo productInfo = productInfoMapper.selectById(id);
+        if (productInfo == null) {
+            throw new IllegalArgumentException("商品不存在");
+        }
+
+        productInfo.setPrice(price);
+        productInfo.setUpdateTime(LocalDateTime.now());
+        productInfoMapper.updateById(productInfo);
+
+        // 更新数据库后，主动删除旧缓存。
+        // 下次查询时，会重新从 MySQL 加载最新数据并回填到 Redis。
+        stringRedisTemplate.delete(Constants.PRODUCT_CACHE_KEY_PREFIX + id);
+        return productInfo;
+    }
+
+    @Override
+    public String getRawCacheValue(Long id) {
+        return stringRedisTemplate.opsForValue().get(Constants.PRODUCT_CACHE_KEY_PREFIX + id);
+    }
+}
+```
+
+**Step 3: 创建控制器 `ProductController.java`**
+
+```java
+package com.example.productcache.controller;
+
+import com.example.productcache.common.Result;
+import com.example.productcache.dto.UpdatePriceRequest;
+import com.example.productcache.entity.ProductInfo;
+import com.example.productcache.service.ProductService;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/products")
+public class ProductController {
+
+    private final ProductService productService;
+
+    public ProductController(ProductService productService) {
+        this.productService = productService;
+    }
+
+    @GetMapping("/{id}")
+    public Result<ProductInfo> getProduct(@PathVariable Long id) {
+        return Result.success(productService.getProductById(id));
+    }
+
+    @PutMapping("/{id}/price")
+    public Result<ProductInfo> updatePrice(@PathVariable Long id, @RequestBody UpdatePriceRequest request) {
+        return Result.success(productService.updatePrice(id, request.getPrice()));
+    }
+
+    @GetMapping("/cache/{id}")
+    public Result<String> getCacheValue(@PathVariable Long id) {
+        return Result.success(productService.getRawCacheValue(id));
+    }
+}
+```
+
+---
+
+### Task 4: 启动项目并验证缓存链路
+
+**Step 1: 启动中间件**
+
+Run:
+
+```bash
+docker compose up -d
+```
+
+**Step 2: 启动应用**
+
+Run:
+
+```bash
+mvn spring-boot:run
+```
+
+**Step 3: 第一次查询商品**
+
+Run:
+
+```bash
+curl "http://localhost:8091/products/1"
+```
+
+Expected:
+
+- 第一次通常会先查 MySQL
+- 查询完成后，Redis 会新增一条缓存
+
+**Step 4: 查看 Redis 中的缓存值**
+
+Run:
+
+```bash
+curl "http://localhost:8091/products/cache/1"
+```
+
+Expected:
+
+- 返回一段 JSON 字符串
+- 说明 Redis 缓存已经写入成功
+
+**Step 5: 更新商品价格**
+
+Run:
+
+```bash
+curl -X PUT "http://localhost:8091/products/1/price" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"price\":249.00}"
+```
+
+Expected:
+
+- MySQL 中价格被更新
+- Redis 里旧缓存被删除
+
+**Step 6: 再次查询商品**
+
+Run:
+
+```bash
+curl "http://localhost:8091/products/1"
+```
+
+Expected:
+
+- 这次会把最新价格重新写回 Redis
+
+---
+
+### Task 5: 常见错误排查
+
+**问题 1：第一次查询就报 Redis 连接失败**
+
+排查：
+
+- `docker compose up -d` 是否已经执行
+- Redis 端口是否是 `6380`
+- `application.yml` 中 `spring.data.redis.port` 是否正确
+
+**问题 2：更新价格后，查询还是旧值**
+
+排查：
+
+- `updatePrice` 方法里是否真的执行了 `stringRedisTemplate.delete(...)`
+- 是否查错了商品 ID
+
+**问题 3：为什么不是更新 MySQL 后同时更新 Redis**
+
+说明：
+
+- 这是另一种写法
+- 但对初学者来说，“更新 DB 后删缓存”更容易理解，也更常见
+
+---
+
+## 你做完这个项目后应该掌握什么
+
+1. Redis 为什么适合做高频读取数据的缓存
+2. 什么是 Cache Aside
+3. 为什么更新数据库后通常要删除缓存
+4. TTL 在缓存场景里的作用是什么
