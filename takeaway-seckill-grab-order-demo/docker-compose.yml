@@ -1,0 +1,146 @@
+version: "3.9"
+
+services:
+  mysql:
+    # 使用官方 MySQL 8.0 镜像。
+    image: mysql:8.0
+    container_name: takeaway-mysql
+    environment:
+      # root 密码只用于本地练习环境。
+      MYSQL_ROOT_PASSWORD: 123456
+      # 默认创建业务库，避免你进容器后手工建库。
+      MYSQL_DATABASE: takeaway_demo
+    ports:
+      # 宿主机 3306 映射到容器 3306。
+      - "3306:3306"
+    command:
+      # 开启 binlog，并把格式改成 ROW，这样 Canal 才能更稳定地解析数据变更。
+      - --server-id=1
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+      - --default-authentication-plugin=mysql_native_password
+    volumes:
+      # 把初始化 SQL 挂进去，容器第一次启动会自动执行。
+      - ./init/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  rabbitmq:
+    # 使用带管理后台的 RabbitMQ 镜像，方便你直接打开页面看交换机和队列。
+    image: rabbitmq:3.13-management
+    container_name: takeaway-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      # 练习环境使用默认账号密码。
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  canal-server:
+    # Canal 服务用于监听 MySQL Binlog。
+    # 这份文档同时会提供“模拟 Canal 发 MQ 消息”的接口，方便你本地调试。
+    image: canal/canal-server:v1.1.7
+    container_name: takeaway-canal
+    ports:
+      - "11111:11111"
+    environment:
+      canal.auto.scan: "true"
+      canal.destinations: "example"
+      canal.instance.master.address: "mysql:3306"
+      canal.instance.dbUsername: "root"
+      canal.instance.dbPassword: "123456"
+      canal.instance.connectionCharset: "UTF-8"
+    depends_on:
+      - mysql
+
+  redis-7001:
+    image: redis:7.2
+    container_name: redis-7001
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - ./init/redis/redis-7001.conf:/usr/local/etc/redis/redis.conf
+    ports:
+      - "7001:7001"
+      - "17001:17001"
+
+  redis-7002:
+    image: redis:7.2
+    container_name: redis-7002
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - ./init/redis/redis-7002.conf:/usr/local/etc/redis/redis.conf
+    ports:
+      - "7002:7002"
+      - "17002:17002"
+
+  redis-7003:
+    image: redis:7.2
+    container_name: redis-7003
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - ./init/redis/redis-7003.conf:/usr/local/etc/redis/redis.conf
+    ports:
+      - "7003:7003"
+      - "17003:17003"
+
+  redis-7004:
+    image: redis:7.2
+    container_name: redis-7004
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - ./init/redis/redis-7004.conf:/usr/local/etc/redis/redis.conf
+    ports:
+      - "7004:7004"
+      - "17004:17004"
+
+  redis-7005:
+    image: redis:7.2
+    container_name: redis-7005
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - ./init/redis/redis-7005.conf:/usr/local/etc/redis/redis.conf
+    ports:
+      - "7005:7005"
+      - "17005:17005"
+
+  redis-7006:
+    image: redis:7.2
+    container_name: redis-7006
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - ./init/redis/redis-7006.conf:/usr/local/etc/redis/redis.conf
+    ports:
+      - "7006:7006"
+      - "17006:17006"
+
+  sentinel-27001:
+    image: redis:7.2
+    container_name: sentinel-27001
+    command: ["redis-server", "/usr/local/etc/redis/sentinel.conf", "--sentinel"]
+    volumes:
+      - ./init/redis/sentinel-27001.conf:/usr/local/etc/redis/sentinel.conf
+    ports:
+      - "27001:27001"
+    depends_on:
+      - redis-7001
+
+  sentinel-27002:
+    image: redis:7.2
+    container_name: sentinel-27002
+    command: ["redis-server", "/usr/local/etc/redis/sentinel.conf", "--sentinel"]
+    volumes:
+      - ./init/redis/sentinel-27002.conf:/usr/local/etc/redis/sentinel.conf
+    ports:
+      - "27002:27002"
+    depends_on:
+      - redis-7001
+
+  sentinel-27003:
+    image: redis:7.2
+    container_name: sentinel-27003
+    command: ["redis-server", "/usr/local/etc/redis/sentinel.conf", "--sentinel"]
+    volumes:
+      - ./init/redis/sentinel-27003.conf:/usr/local/etc/redis/sentinel.conf
+    ports:
+      - "27003:27003"
+    depends_on:
+      - redis-7001

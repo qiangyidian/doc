@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.takeaway.mapper.MealMapper">
+
+    <select id="selectMealDetailById" resultType="com.example.takeaway.entity.Meal">
+        SELECT
+            m.id,
+            m.merchant_id,
+            m.meal_name,
+            m.meal_desc,
+            m.price,
+            m.hot_flag,
+            m.status,
+            s.stock,
+            m.create_time,
+            m.update_time
+        FROM t_meal m
+                 LEFT JOIN t_meal_stock s ON m.id = s.meal_id
+        WHERE m.id = #{mealId}
+    </select>
+
+    <select id="selectHotMeals" resultType="com.example.takeaway.entity.Meal">
+        SELECT
+        m.id,
+        m.merchant_id,
+        m.meal_name,
+        m.meal_desc,
+        m.price,
+        m.hot_flag,
+        m.status,
+        s.stock,
+        m.create_time,
+        m.update_time
+        FROM t_meal m
+        LEFT JOIN t_meal_stock s ON m.id = s.meal_id
+        WHERE m.status = 1
+        AND m.hot_flag = 1
+        <if test="merchantId != null">
+            AND m.merchant_id = #{merchantId}
+        </if>
+    </select>
+
+    <select id="selectAllValidMealIds" resultType="java.lang.Long">
+        SELECT id
+        FROM t_meal
+        WHERE status = 1
+    </select>
+
+    <update id="updateMealInfo">
+        UPDATE t_meal
+        SET meal_name = #{meal.mealName},
+            meal_desc = #{meal.mealDesc},
+            price = #{meal.price},
+            hot_flag = #{meal.hotFlag},
+            status = #{meal.status},
+            update_time = NOW()
+        WHERE id = #{mealId}
+    </update>
+
+    <select id="selectBasicById" resultType="com.example.takeaway.entity.Meal">
+        SELECT
+            id,
+            merchant_id,
+            meal_name,
+            meal_desc,
+            price,
+            hot_flag,
+            status,
+            create_time,
+            update_time
+        FROM t_meal
+        WHERE id = #{mealId}
+    </select>
+</mapper>

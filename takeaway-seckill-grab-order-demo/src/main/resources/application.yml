@@ -1,0 +1,60 @@
+server:
+  # 应用端口。
+  port: 8080
+
+spring:
+  application:
+    # 应用名只是一个标识，方便后续日志识别。
+    name: takeaway-seckill-grab-order-demo
+
+  datasource:
+    # MySQL 地址。
+    url: jdbc:mysql://127.0.0.1:3306/takeaway_demo?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  data:
+    redis:
+      # 这里按业务访问 Redis Cluster。
+      cluster:
+        nodes:
+          - 127.0.0.1:7001
+          - 127.0.0.1:7002
+          - 127.0.0.1:7003
+          - 127.0.0.1:7004
+          - 127.0.0.1:7005
+          - 127.0.0.1:7006
+      timeout: 3000ms
+
+  rabbitmq:
+    host: 127.0.0.1
+    port: 5672
+    username: guest
+    password: guest
+    listener:
+      simple:
+        # 开启手动确认，让你能清楚看到消息消费成功和失败的边界。
+        acknowledge-mode: manual
+        # 每次只拉 1 条消息，方便观察和调试。
+        prefetch: 1
+
+mybatis:
+  mapper-locations: classpath:/mapper/*.xml
+  configuration:
+    # 把数据库里的下划线字段自动映射到 Java 驼峰字段。
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+takeaway:
+  cache:
+    # 菜品详情缓存基础过期时间：30 分钟。
+    meal-ttl-minutes: 30
+    # 热门菜单预热基础过期时间：24 小时。
+    hot-meal-ttl-hours: 24
+    # 随机附加 1 到 5 分钟，防止同一时刻大量 key 一起失效。
+    random-ttl-minutes-min: 1
+    random-ttl-minutes-max: 5
+  bloom:
+    # 布隆过滤器位图大小。
+    bitmap-size: 1000000

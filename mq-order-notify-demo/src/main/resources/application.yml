@@ -1,0 +1,32 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: mq-order-notify-demo
+
+  datasource:
+    url: jdbc:mysql://localhost:3307/order_notify_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+      data-locations: classpath:data.sql
+
+  rabbitmq:
+    host: localhost
+    port: 5673
+    username: guest
+    password: guest
+    listener:
+      simple:
+        acknowledge-mode: manual
+        prefetch: 1
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl

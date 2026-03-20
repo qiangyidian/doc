@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.takeaway.mapper.MealStockMapper">
+
+    <select id="selectByMealId" resultType="com.example.takeaway.entity.MealStock">
+        SELECT
+            id,
+            meal_id,
+            stock,
+            create_time,
+            update_time
+        FROM t_meal_stock
+        WHERE meal_id = #{mealId}
+    </select>
+
+    <update id="updateStock">
+        UPDATE t_meal_stock
+        SET stock = #{stock},
+            update_time = NOW()
+        WHERE meal_id = #{mealId}
+    </update>
+</mapper>
