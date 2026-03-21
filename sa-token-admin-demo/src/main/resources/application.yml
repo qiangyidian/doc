@@ -1,0 +1,49 @@
+server:
+  # 应用运行端口。
+  port: 8080
+
+spring:
+  application:
+    # 应用名称。
+    name: sa-token-admin-demo
+
+  datasource:
+    # MySQL 连接地址。
+    url: jdbc:mysql://127.0.0.1:3306/sa_token_demo?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  data:
+    redis:
+      # Redis 地址。
+      host: 127.0.0.1
+      port: 6379
+      database: 0
+      timeout: 3000ms
+
+mybatis:
+  # Mapper XML 文件位置。
+  mapper-locations: classpath:/mapper/*.xml
+  configuration:
+    # 开启下划线转驼峰。
+    map-underscore-to-camel-case: true
+    # 打印 SQL，方便学习时看底层执行了什么。
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+sa-token:
+  # token 名称，前端请求时默认用这个名字传 token。
+  token-name: satoken
+  # token 有效期，单位秒。这里是 7 天。
+  timeout: 604800
+  # token 最后活跃时间，超过 30 分钟不操作就会被视为失活。
+  active-timeout: 1800
+  # 是否允许同一账号多地同时登录。
+  is-concurrent: true
+  # 在多人登录同一账号时，是否共享同一个 token。
+  # false 表示每次登录都会生成新的 token，更适合后台系统演示。
+  is-share: false
+  # token 风格。
+  token-style: uuid
+  # 是否打印 Sa-Token 的日志。
+  is-log: true

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.satokenadmin.mapper.SysUserMapper">
+
+    <select id="selectByUsername" resultType="com.example.satokenadmin.entity.SysUser">
+        SELECT
+            id,
+            username,
+            password,
+            nickname,
+            status,
+            create_time,
+            update_time
+        FROM sys_user
+        WHERE username = #{username}
+    </select>
+
+    <select id="selectById" resultType="com.example.satokenadmin.entity.SysUser">
+        SELECT
+            id,
+            username,
+            password,
+            nickname,
+            status,
+            create_time,
+            update_time
+        FROM sys_user
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectAll" resultType="com.example.satokenadmin.entity.SysUser">
+        SELECT
+            id,
+            username,
+            password,
+            nickname,
+            status,
+            create_time,
+            update_time
+        FROM sys_user
+        ORDER BY id ASC
+    </select>
+
+    <insert id="insert" parameterType="com.example.satokenadmin.entity.SysUser"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_user (
+            username,
+            password,
+            nickname,
+            status,
+            create_time,
+            update_time
+        ) VALUES (
+                     #{username},
+                     #{password},
+                     #{nickname},
+                     #{status},
+                     NOW(),
+                     NOW()
+                 )
+    </insert>
+</mapper>

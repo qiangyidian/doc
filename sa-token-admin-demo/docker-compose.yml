@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  mysql:
+    # 使用官方 MySQL 8.0 镜像。
+    image: mysql:8.0
+    container_name: sa-token-mysql
+    environment:
+      # root 密码仅用于本地练习。
+      MYSQL_ROOT_PASSWORD: 123456
+      # 第一次启动时自动创建这个数据库。
+      MYSQL_DATABASE: sa_token_demo
+    ports:
+      - "3306:3306"
+    command:
+      # 改成 mysql_native_password，避免某些连接器在本地练习时报兼容问题。
+      - --default-authentication-plugin=mysql_native_password
+    volumes:
+      # 把初始化 SQL 挂载进去。
+      - ./init/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  redis:
+    # 使用官方 Redis 镜像。
+    image: redis:7
+    container_name: sa-token-redis
+    ports:
+      - "6379:6379"
+    command:
+      # 开启 AOF，重启后数据更稳一些。
+      - redis-server
+      - --appendonly
+      - yes
