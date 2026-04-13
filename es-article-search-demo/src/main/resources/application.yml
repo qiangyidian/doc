@@ -1,0 +1,13 @@
+server:
+  port: 8142
+
+spring:
+  application:
+    name: es-article-search-demo
+  elasticsearch:
+    uris: http://localhost:9202
+
+
+logging:
+  level:
+    org.springframework.data.elasticsearch.client: info

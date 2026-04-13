@@ -1,0 +1,13 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: java-lock-demo
+
+  data:
+    redis:
+      # Redis 地址，Redisson 最终也会连这个实例。
+      host: 127.0.0.1
+      port: 6379
+      database: 0

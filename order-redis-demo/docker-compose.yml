@@ -1,0 +1,29 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: redis-product-cache-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: product_cache_db
+    ports:
+      - "3310:3306"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - redis-product-cache-mysql-data:/var/lib/mysql
+
+  redis:
+    image: redis:7.2
+    container_name: redis-product-cache-redis
+    restart: always
+    ports:
+      - "6380:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-product-cache-redis-data:/data
+
+volumes:
+  redis-product-cache-mysql-data:
+  redis-product-cache-redis-data:
