@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  postgres:
+    # 使用带 pgvector 扩展的 PostgreSQL 镜像。
+    # 这样你启动容器后，不需要再手工安装 vector 扩展。
+    image: pgvector/pgvector:pg16
+    container_name: rag-postgres
+    environment:
+      # 练习环境直接写死用户名、密码和库名，便于你一步一步照着做。
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: rag_demo
+    ports:
+      # 宿主机 5432 映射到容器 5432。
+      - "5432:5432"
+    volumes:
+      # 挂载初始化 SQL，让数据库第一次启动时自动建表。
+      - ./init/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      # 挂载数据目录，避免容器删掉后数据丢失。
+      - rag_pg_data:/var/lib/postgresql/data
+
+volumes:
+  # PostgreSQL 数据卷。
+  rag_pg_data:

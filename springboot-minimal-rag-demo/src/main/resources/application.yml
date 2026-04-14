@@ -1,0 +1,63 @@
+server:
+  # 应用端口。
+  port: 8080
+
+spring:
+  application:
+    # 应用名称，主要用于日志和识别。
+    name: springboot-minimal-rag-demo
+
+  datasource:
+    # PostgreSQL 数据源。
+    url: jdbc:postgresql://localhost:5432/rag_demo
+    username: postgres
+    password: 123456
+    driver-class-name: org.postgresql.Driver
+
+  ai:
+    ollama:
+      # 本机 Ollama 服务地址。
+      base-url: http://localhost:11434
+      chat:
+        options:
+          # 直接复用本机已安装的小模型，先保证最小链路跑通。
+          model: deepseek-r1:1.5b
+
+      embedding:
+        options:
+          # 这个模型在本机 Ollama 中已安装，实测输出 768 维向量。
+          model: nomic-embed-text:v1.5
+
+    vectorstore:
+      pgvector:
+        # 启动时由项目自己的引导器建表并预热示例数据。
+        initialize-schema: false
+        # nomic-embed-text:v1.5 的向量维度是 768。
+        dimensions: 768
+        # 用新的本地向量表，避免和之前 1024 维的演示表冲突。
+        table-name: vector_store_ollama
+
+mybatis:
+  # Mapper XML 文件位置。
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    # 把下划线字段自动映射到驼峰属性。
+    map-underscore-to-camel-case: true
+
+rag:
+  knowledge-base:
+    # 默认知识库分类。
+    default-category: 知识
+    # 这是最小版的基础分块大小。
+    chunk-size: 500
+    # 这是最小版的基础重叠大小。
+    chunk-overlap: 80
+    # 启动时自动导入项目自带知识库目录。
+    bootstrap-path: knowledge-base
+    # 内置知识统一打到“知识”分类，和 Apifox 示例请求保持一致。
+    bootstrap-category: 知识
+  retrieval:
+    # 纯向量检索先从 TopK=5 开始，和教程建议保持一致。
+    top-k: 5
+    # 相似度阈值先从 0.55 起步，偏保守但不至于过严。
+    similarity-threshold: 0.55

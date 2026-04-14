@@ -1,0 +1,110 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <!-- Maven POM 模型版本。 -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 这里直接使用 Spring Boot 父工程，省掉很多依赖版本管理工作。 -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.0</version>
+        <relativePath />
+    </parent>
+
+    <groupId>com.qiange</groupId>
+    <artifactId>springboot-minimal-rag-demo</artifactId>
+    <version>1.0.0</version>
+    <name>springboot-minimal-rag-demo</name>
+    <description>Spring Boot 最小可用 RAG 示例项目</description>
+
+    <properties>
+        <!-- Java 17 是 Spring Boot 3.x 的主流版本，也是教程里最稳妥的选择。 -->
+        <java.version>17</java.version>
+
+        <!-- Spring AI 使用 BOM 管理版本。 -->
+        <spring-ai.version>1.1.4</spring-ai.version>
+
+        <!-- MyBatis Starter 单独声明版本。 -->
+        <mybatis.boot.version>3.0.4</mybatis.boot.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- 导入 Spring AI BOM，让相关 starter 的版本保持一致。 -->
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!-- Web 依赖：提供 Controller、JSON 转换和嵌入式 Tomcat。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- 参数校验依赖：用于 @Valid、@NotBlank 等注解。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- MyBatis：用于管理 kb_document 文档台账表。 -->
+        <dependency>
+            <groupId>org.mybatis.spring.boot</groupId>
+            <artifactId>mybatis-spring-boot-starter</artifactId>
+            <version>${mybatis.boot.version}</version>
+        </dependency>
+
+        <!-- PostgreSQL 驱动：Spring Boot 连接 PG 必须有它。 -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+        </dependency>
+
+        <!-- Spring AI Ollama Model Starter：
+             直接复用本机 Ollama 的聊天和向量模型，避免外部 API Key 问题。 -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-ollama</artifactId>
+        </dependency>
+
+        <!-- Spring AI PGVector Starter：
+             负责把 Document 写入 PGVector，并支持相似度搜索。 -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
+        </dependency>
+
+        <!-- Lombok：减少 getter/setter/构造器样板代码。 -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 测试依赖。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Spring Boot Maven 插件，用于打包和运行。 -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
