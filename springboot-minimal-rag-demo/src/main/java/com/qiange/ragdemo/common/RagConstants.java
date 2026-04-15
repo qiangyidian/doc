@@ -1,16 +1,10 @@
 package com.qiange.ragdemo.common;
 
 /**
- * RAG 元数据（Metadata）键名常量池。
- * 用于统一定义贯穿整个知识生命周期的附加信息键。
- *
- * 为什么这里要专门抽一层常量？
- * 因为知识导入、分块、检索、返回引用片段都会反复用到这些 key。
- * 如果每个地方都手写字符串，很容易出现拼写不一致，最后导致元数据丢失。
+ * RAG 元数据和检索来源常量。
  */
 public final class RagConstants {
 
-    // 私有化构造方法，防止该常量类被意外实例化
     private RagConstants() {
     }
 
@@ -48,4 +42,19 @@ public final class RagConstants {
      * 元数据键：分块后，当前文档片段在源文档全文中的结束字符偏移量。
      */
     public static final String METADATA_END_OFFSET = "endOffset";
+
+    /**
+     * 检索来源：纯向量检索
+     */
+    public static final String RETRIEVAL_SOURCE_VECTOR = "VECTOR";
+
+    /**
+     * 检索来源：纯关键字（如 BM25）检索
+     */
+    public static final String RETRIEVAL_SOURCE_KEYWORD = "KEYWORD";
+
+    /**
+     * 检索来源：混合（向量 + 关键字）检索
+     */
+    public static final String RETRIEVAL_SOURCE_HYBRID = "VECTOR+KEYWORD";
 }

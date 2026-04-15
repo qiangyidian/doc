@@ -6,58 +6,92 @@
 
     <resultMap id="BaseResultMap" type="com.qiange.ragdemo.entity.KnowledgeDocumentEntity">
         <id property="id" column="id"/>
-        <result property="docId" column="doc_id"/>
-        <result property="title" column="title"/>
         <result property="fileName" column="file_name"/>
+        <result property="filePath" column="file_path"/>
+        <result property="fileHash" column="file_hash"/>
         <result property="category" column="category"/>
-        <result property="sourcePath" column="source_path"/>
         <result property="status" column="status"/>
-        <result property="chunkCount" column="chunk_count"/>
+        <result property="remark" column="remark"/>
+        <result property="lastSyncAt" column="last_sync_at"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
 
-    <select id="selectByDocumentId" resultMap="BaseResultMap">
+    <select id="selectByFilePath" resultMap="BaseResultMap">
         select id,
-               doc_id,
-               title,
                file_name,
+               file_path,
+               file_hash,
                category,
-               source_path,
                status,
-               chunk_count,
+               remark,
+               last_sync_at,
                created_at,
                updated_at
         from kb_document
-        where doc_id = #{documentId}
+        where file_path = #{filePath}
+        limit 1
+    </select>
+
+    <select id="selectByFileHash" resultMap="BaseResultMap">
+        select id,
+               file_name,
+               file_path,
+               file_hash,
+               category,
+               status,
+               remark,
+               last_sync_at,
+               created_at,
+               updated_at
+        from kb_document
+        where file_hash = #{fileHash}
         limit 1
     </select>
 
     <insert id="insert" parameterType="com.qiange.ragdemo.entity.KnowledgeDocumentEntity"
             useGeneratedKeys="true" keyProperty="id">
         insert into kb_document (
-            doc_id,
-            title,
             file_name,
+            file_path,
+            file_hash,
             category,
-            source_path,
             status,
-            chunk_count
+            remark,
+            last_sync_at
         ) values (
-                     #{docId},
-                     #{title},
-                     #{fileName},
-                     #{category},
-                     #{sourcePath},
-                     #{status},
-                     #{chunkCount}
-                 )
+            #{fileName},
+            #{filePath},
+            #{fileHash},
+            #{category},
+            #{status},
+            #{remark},
+            now()
+        )
     </insert>
 
-    <update id="updateStatusAndChunkCount">
+    <update id="updateBeforeResync">
+        update kb_document
+        set file_hash = #{fileHash},
+            status = #{status},
+            remark = #{remark},
+            updated_at = now()
+        where id = #{id}
+    </update>
+
+    <update id="updateAfterSync">
         update kb_document
         set status = #{status},
-            chunk_count = #{chunkCount},
+            remark = #{remark},
+            last_sync_at = now(),
+            updated_at = now()
+        where id = #{id}
+    </update>
+
+    <update id="updateFailed">
+        update kb_document
+        set status = #{status},
+            remark = #{remark},
             updated_at = now()
         where id = #{id}
     </update>

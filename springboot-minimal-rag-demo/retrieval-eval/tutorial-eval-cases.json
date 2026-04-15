@@ -1,0 +1,14 @@
+[
+  {
+    "question": "为什么接口名检索不稳定",
+    "category": "知识",
+    "expectedSourceFileName": "03-hybrid-retrieval.md",
+    "description": "验证混合检索是否能命中接口名、字段名等精确术语场景"
+  },
+  {
+    "question": "为什么要做查询改写",
+    "category": "知识",
+    "expectedSourceFileName": "04-query-rewrite.md",
+    "description": "验证查询改写知识是否能被优先召回"
+  }
+]

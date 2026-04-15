@@ -27,16 +27,17 @@ class KnowledgeDocumentContractTest {
                 .toList();
 
         assertAll(
-                () -> assertTrue(fieldNames.contains("docId")),
-                () -> assertTrue(fieldNames.contains("title")),
                 () -> assertTrue(fieldNames.contains("fileName")),
+                () -> assertTrue(fieldNames.contains("filePath")),
+                () -> assertTrue(fieldNames.contains("fileHash")),
                 () -> assertTrue(fieldNames.contains("category")),
-                () -> assertTrue(fieldNames.contains("sourcePath")),
                 () -> assertTrue(fieldNames.contains("status")),
-                () -> assertTrue(fieldNames.contains("chunkCount")),
-                () -> assertFalse(fieldNames.contains("filePath")),
-                () -> assertFalse(fieldNames.contains("fileHash")),
-                () -> assertFalse(fieldNames.contains("remark"))
+                () -> assertTrue(fieldNames.contains("remark")),
+                () -> assertTrue(fieldNames.contains("lastSyncAt")),
+                () -> assertFalse(fieldNames.contains("docId")),
+                () -> assertFalse(fieldNames.contains("title")),
+                () -> assertFalse(fieldNames.contains("sourcePath")),
+                () -> assertFalse(fieldNames.contains("chunkCount"))
         );
     }
 
@@ -45,13 +46,15 @@ class KnowledgeDocumentContractTest {
         String mapperXml = Files.readString(Path.of("src/main/resources/mapper/KnowledgeDocumentMapper.xml"));
 
         assertAll(
-                () -> assertTrue(mapperXml.contains("doc_id")),
-                () -> assertTrue(mapperXml.contains("title")),
-                () -> assertTrue(mapperXml.contains("source_path")),
-                () -> assertTrue(mapperXml.contains("chunk_count")),
-                () -> assertFalse(mapperXml.contains("file_path")),
-                () -> assertFalse(mapperXml.contains("file_hash")),
-                () -> assertFalse(mapperXml.contains("remark"))
+                () -> assertTrue(mapperXml.contains("file_name")),
+                () -> assertTrue(mapperXml.contains("file_path")),
+                () -> assertTrue(mapperXml.contains("file_hash")),
+                () -> assertTrue(mapperXml.contains("remark")),
+                () -> assertTrue(mapperXml.contains("last_sync_at")),
+                () -> assertFalse(mapperXml.contains("doc_id")),
+                () -> assertFalse(mapperXml.contains("title")),
+                () -> assertFalse(mapperXml.contains("source_path")),
+                () -> assertFalse(mapperXml.contains("chunk_count"))
         );
     }
 
@@ -63,22 +66,37 @@ class KnowledgeDocumentContractTest {
         KnowledgeDocumentEntity entity = service.createPendingDocument(
                 "knowledge-base/01-rag-intro.md",
                 "hash-001",
-                "tutorial",
-                null
+                "知识"
         );
 
         assertNotNull(entity);
         assertNotNull(mapper.insertedEntity);
 
         assertAll(
-                () -> assertEquals("hash-001", readField(mapper.insertedEntity, "docId")),
-                () -> assertEquals("01-rag-intro.md", readField(mapper.insertedEntity, "title")),
                 () -> assertEquals("01-rag-intro.md", readField(mapper.insertedEntity, "fileName")),
                 () -> assertEquals(Path.of("knowledge-base/01-rag-intro.md").toAbsolutePath().toString(),
-                        readField(mapper.insertedEntity, "sourcePath")),
-                () -> assertEquals("tutorial", readField(mapper.insertedEntity, "category")),
+                        readField(mapper.insertedEntity, "filePath")),
+                () -> assertEquals("hash-001", readField(mapper.insertedEntity, "fileHash")),
+                () -> assertEquals("知识", readField(mapper.insertedEntity, "category")),
                 () -> assertEquals("PENDING", readField(mapper.insertedEntity, "status")),
-                () -> assertEquals(0, readField(mapper.insertedEntity, "chunkCount"))
+                () -> assertEquals("首次发现文件，等待同步", readField(mapper.insertedEntity, "remark"))
+        );
+    }
+
+    @Test
+    void statusTransitionsShouldDelegateToMapperWithExpectedStates() {
+        CapturingKnowledgeDocumentMapper mapper = new CapturingKnowledgeDocumentMapper();
+        KnowledgeDocumentServiceImpl service = new KnowledgeDocumentServiceImpl(mapper);
+
+        service.markBeforeResync(7L, "hash-002", "准备重同步");
+        service.markImported(7L, "同步成功");
+        service.markImportFailed(7L, "同步失败");
+
+        assertAll(
+                () -> assertEquals(7L, mapper.lastUpdatedId),
+                () -> assertEquals("FAILED", mapper.lastUpdatedStatus),
+                () -> assertEquals("同步失败", mapper.lastUpdatedRemark),
+                () -> assertEquals("hash-002", mapper.lastUpdatedFileHashBeforeResync)
         );
     }
 
@@ -91,9 +109,18 @@ class KnowledgeDocumentContractTest {
     private static final class CapturingKnowledgeDocumentMapper implements KnowledgeDocumentMapper {
 
         private KnowledgeDocumentEntity insertedEntity;
+        private Long lastUpdatedId;
+        private String lastUpdatedFileHashBeforeResync;
+        private String lastUpdatedStatus;
+        private String lastUpdatedRemark;
 
         @Override
-        public KnowledgeDocumentEntity selectByDocumentId(String documentId) {
+        public KnowledgeDocumentEntity selectByFileHash(String fileHash) {
+            return null;
+        }
+
+        @Override
+        public KnowledgeDocumentEntity selectByFilePath(String filePath) {
             return null;
         }
 
@@ -104,7 +131,27 @@ class KnowledgeDocumentContractTest {
         }
 
         @Override
-        public int updateStatusAndChunkCount(Long id, String status, Integer chunkCount) {
+        public int updateBeforeResync(Long id, String fileHash, String status, String remark) {
+            this.lastUpdatedId = id;
+            this.lastUpdatedFileHashBeforeResync = fileHash;
+            this.lastUpdatedStatus = status;
+            this.lastUpdatedRemark = remark;
+            return 1;
+        }
+
+        @Override
+        public int updateAfterSync(Long id, String status, String remark) {
+            this.lastUpdatedId = id;
+            this.lastUpdatedStatus = status;
+            this.lastUpdatedRemark = remark;
+            return 1;
+        }
+
+        @Override
+        public int updateFailed(Long id, String status, String remark) {
+            this.lastUpdatedId = id;
+            this.lastUpdatedStatus = status;
+            this.lastUpdatedRemark = remark;
             return 1;
         }
     }

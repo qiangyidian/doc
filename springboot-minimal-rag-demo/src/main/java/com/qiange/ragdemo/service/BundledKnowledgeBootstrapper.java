@@ -127,12 +127,13 @@ public class BundledKnowledgeBootstrapper {
         jdbcTemplate.execute("CREATE EXTENSION IF NOT EXISTS vector");
         // 创建 uuid 生成所需的扩展
         jdbcTemplate.execute("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"");
+        jdbcTemplate.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm");
         // 创建存储文档和向量的表。表名和向量维度通过格式化字符串安全注入（前提是已做表名合法性校验）
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS %s (
                     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                     content TEXT NOT NULL,
-                    metadata JSON,
+                    metadata JSONB,
                     embedding VECTOR(%d)
                 )
                 """.formatted(vectorTableName, vectorDimensions));
@@ -142,6 +143,11 @@ public class BundledKnowledgeBootstrapper {
                 ON %s
                 USING hnsw (embedding vector_cosine_ops)
                 """.formatted(vectorTableName + "_embedding_hnsw_idx", vectorTableName));
+        jdbcTemplate.execute("""
+                CREATE INDEX IF NOT EXISTS %s
+                ON %s
+                USING gin (content gin_trgm_ops)
+                """.formatted(vectorTableName + "_content_trgm_idx", vectorTableName));
     }
 
     /**
@@ -151,14 +157,15 @@ public class BundledKnowledgeBootstrapper {
      * @return 分块完毕的知识片段列表
      */
     private List<Document> loadBundledDocuments(Path bootstrapPath) {
-        try (Stream<Path> pathStream = Files.list(bootstrapPath)) {
+        boolean recursive = Boolean.TRUE.equals(ragProperties.getKnowledgeBase().getRecursiveSync());
+        try (Stream<Path> pathStream = recursive ? Files.walk(bootstrapPath) : Files.list(bootstrapPath)) {
             return pathStream
                     // 仅处理常规文件（忽略子目录等）
                     .filter(Files::isRegularFile)
                     // 过滤出受支持的文件格式（如 .md, .txt）
                     .filter(this::isSupportedFile)
                     // 按文件名排序，保证不同环境下处理顺序一致
-                    .sorted(Comparator.comparing(path -> path.getFileName().toString()))
+                    .sorted(Comparator.comparing(path -> path.toAbsolutePath().toString()))
                     // 核心：逐个加载文件并分块
                     .map(this::loadAndSplit)
                     // 将每个文件分出的一组小块（List<Document>），扁平化成一个大的 List<Document>
