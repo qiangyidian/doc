@@ -4,9 +4,12 @@ import com.qiange.ragdemo.common.RagConstants;
 import com.qiange.ragdemo.dto.AskQuestionRequest;
 import com.qiange.ragdemo.dto.AskQuestionResponse;
 import com.qiange.ragdemo.dto.ReferenceChunkResponse;
+import com.qiange.ragdemo.service.ContextCompressionService;
 import com.qiange.ragdemo.service.HybridRetrievalService;
 import com.qiange.ragdemo.service.QueryRewriteService;
 import com.qiange.ragdemo.service.RagChatService;
+import com.qiange.ragdemo.service.RerankService;
+import com.qiange.ragdemo.service.model.CompressedContextResult;
 import com.qiange.ragdemo.service.model.RetrievedChunk;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
@@ -17,14 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 第二阶段 RAG 问答服务实现。
- *
- * 整条主链路如下：
- * 1. 对用户问题进行查询重写
- * 2. 用重写后的多路查询词去进行混合检索（向量 + BM25）
- * 3. 融合排序检索结果，整理成上下文
- * 4. 把“问题 + 上下文”一起交给大模型
- * 5. 返回答案，并把命中的片段一起带回去
+ * 第三阶段 RAG 问答服务实现。
  */
 @Service
 @RequiredArgsConstructor
@@ -35,6 +31,12 @@ public class RagChatServiceImpl implements RagChatService {
 
     // 混合检索服务，用于多路召回知识片段并融合排序
     private final HybridRetrievalService hybridRetrievalService;
+
+    // 精排服务，用于对候选片段做二次排序
+    private final RerankService rerankService;
+
+    // 上下文压缩服务，用于去重、压缩和裁剪最终上下文
+    private final ContextCompressionService contextCompressionService;
 
     // 大模型聊天客户端，用于与底层的大语言模型通信生成最终答案
     private final ChatClient chatClient;
@@ -58,14 +60,32 @@ public class RagChatServiceImpl implements RagChatService {
             return AskQuestionResponse.builder()
                     .answer("当前知识库中没有检索到足够相关的内容，请先补充知识文档或调整检索参数。")
                     .rewrittenQueries(queries)
+                    .contextLengthBeforeCompression(0)
+                    .contextLengthAfterCompression(0)
                     .references(List.of())
                     .build();
         }
 
-        // 4. 构建上下文：将检索到的片段列表格式化成文本，供大模型阅读
-        String context = buildContext(chunks);
+        // 4. 精排和压缩：让最终上下文尽量短而准
+        List<RetrievedChunk> rerankedChunks = rerankService.rerank(request.getQuestion(), chunks);
+        CompressedContextResult compressedContextResult =
+                contextCompressionService.compress(request.getQuestion(), rerankedChunks);
+        List<RetrievedChunk> finalChunks = compressedContextResult.getChunks();
 
-        // 5. 构建系统提示词（System Prompt），给大模型立规矩
+        if (finalChunks.isEmpty()) {
+            return AskQuestionResponse.builder()
+                    .answer("当前知识库中没有足够高质量的上下文支持回答该问题，请先补充知识或调整精排与压缩参数。")
+                    .rewrittenQueries(queries)
+                    .contextLengthBeforeCompression(compressedContextResult.getContextLengthBeforeCompression())
+                    .contextLengthAfterCompression(compressedContextResult.getContextLengthAfterCompression())
+                    .references(List.of())
+                    .build();
+        }
+
+        // 5. 构建上下文：将最终入选片段格式化成文本，供大模型阅读
+        String context = buildContext(finalChunks);
+
+        // 6. 构建系统提示词（System Prompt），给大模型立规矩
         String systemPrompt = """
                 你是一个严格基于知识库上下文回答问题的助手。
                 你的回答必须遵守以下规则：
@@ -75,34 +95,36 @@ public class RagChatServiceImpl implements RagChatService {
                 4. 回答应尽量清晰、结构化、简洁
                 """;
 
-        // 6. 构建用户提示词（User Prompt），将“整理好的参考上下文”和“用户实际的问题”拼接在一起
+        // 7. 构建用户提示词（User Prompt），将“整理好的参考上下文”和“用户实际的问题”拼接在一起
         String userPrompt = """
-                请基于以下知识片段回答问题。
+                请基于以下高质量上下文回答问题。
 
-                【知识片段开始】
+                【上下文开始】
                 %s
-                【知识片段结束】
+                【上下文结束】
 
                 用户问题：
                 %s
                 """.formatted(context, request.getQuestion());
 
-        // 7. 发起大模型调用（Generation）。带上系统指令和用户输入，同步等待模型生成最终答案内容
+        // 8. 发起大模型调用（Generation）。带上系统指令和用户输入，同步等待模型生成最终答案内容
         String answer = chatClient.prompt()
                 .system(systemPrompt)
                 .user(userPrompt)
                 .call()
                 .content();
 
-        // 8. 将刚才检索到的 Document 对象列表转换为面向前端的 DTO 对象，包含文档来源和片段内容等
-        List<ReferenceChunkResponse> references = chunks.stream()
+        // 9. 将最终入选片段转换为前端响应 DTO
+        List<ReferenceChunkResponse> references = finalChunks.stream()
                 .map(this::toReferenceChunkResponse)
                 .toList();
 
-        // 9. 封装并返回最终结果：大模型的答案 + 重写后的查询词 + 检索到的相关知识片段
+        // 10. 封装并返回最终结果：答案 + 查询重写 + 上下文压缩统计 + 参考片段
         return AskQuestionResponse.builder()
                 .answer(answer)
                 .rewrittenQueries(queries)
+                .contextLengthBeforeCompression(compressedContextResult.getContextLengthBeforeCompression())
+                .contextLengthAfterCompression(compressedContextResult.getContextLengthAfterCompression())
                 .references(references)
                 .build();
     }
@@ -124,11 +146,11 @@ public class RagChatServiceImpl implements RagChatService {
             builder.append("来源文件：")
                     .append(metadata.getOrDefault(RagConstants.METADATA_SOURCE_FILE_NAME, "unknown"))
                     .append("\n");
-            // 调试用：显示召回来源和融合得分
+            // 调试用：显示召回来源、融合得分和精排得分
             builder.append("检索来源：").append(chunk.getRetrievalSource()).append("\n");
             builder.append("融合得分：").append(chunk.getFusionScore()).append("\n");
-            // 加入文档的核心文本内容
-            builder.append(document.getText()).append("\n\n");
+            builder.append("精排得分：").append(chunk.getRerankScore()).append("\n");
+            builder.append(chunk.getCompressedContent()).append("\n\n");
         }
 
         return builder.toString();
@@ -148,6 +170,11 @@ public class RagChatServiceImpl implements RagChatService {
                 .content(document.getText())                                                         // 提取片段正文
                 .retrievalSource(chunk.getRetrievalSource())                                         // 提取检索来源
                 .fusionScore(chunk.getFusionScore())                                                 // 提取融合得分
+                .rerankScore(chunk.getRerankScore())                                                 // 提取精排得分
+                .compressedContent(chunk.getCompressedContent())                                     // 提取压缩内容
+                .finalSelectionStatus(chunk.isSelectedForAnswer()
+                        ? RagConstants.PIPELINE_SELECTED
+                        : RagConstants.PIPELINE_DROPPED)
                 .build();
     }
 

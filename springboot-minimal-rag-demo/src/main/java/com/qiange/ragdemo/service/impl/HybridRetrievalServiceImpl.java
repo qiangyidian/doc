@@ -14,10 +14,11 @@ import org.springframework.util.DigestUtils;
 import org.springframework.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.LinkedHashMap;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.ArrayList;
 
 /**
  * 混合检索服务实现。
@@ -69,10 +70,10 @@ public class HybridRetrievalServiceImpl implements HybridRetrievalService {
         }
 
         // 3. 对合并池里所有的知识片段，根据最终累加出来的得分（fusionScore）进行从高到低排序，
-        //    并且只返回前 N 个（fusionTopK），避免上下文过长超出大模型窗口。
+        //    只返回进入第三阶段精排的候选集。
         return mergedChunkMap.values().stream()
-                .sorted(Comparator.comparing(RetrievedChunk::getFusionScore).reversed())
-                .limit(ragProperties.getRetrieval().getFusionTopK())
+                .sorted(Comparator.comparing(HybridRetrievalServiceImpl::safeFusionScore).reversed())
+                .limit(ragProperties.getRetrieval().getCandidateTopK())
                 .toList();
     }
 
@@ -122,6 +123,9 @@ public class HybridRetrievalServiceImpl implements HybridRetrievalService {
                         .document(document)
                         .retrievalSource(source)
                         .fusionScore(deltaScore)
+                        .rerankScore(null)
+                        .compressedContent(null)
+                        .selectedForAnswer(false)
                         .build());
                 continue;
             }
@@ -171,5 +175,9 @@ public class HybridRetrievalServiceImpl implements HybridRetrievalService {
      */
     private String escapeFilterValue(String value) {
         return value.replace("'", "\\'");
+    }
+
+    private static Double safeFusionScore(RetrievedChunk chunk) {
+        return chunk.getFusionScore() == null ? 0D : chunk.getFusionScore();
     }
 }

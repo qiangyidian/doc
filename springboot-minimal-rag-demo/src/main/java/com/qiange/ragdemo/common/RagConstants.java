@@ -1,7 +1,7 @@
 package com.qiange.ragdemo.common;
 
 /**
- * RAG 元数据和检索来源常量。
+ * RAG 元数据和检索流水线常量。
  */
 public final class RagConstants {
 
@@ -57,4 +57,14 @@ public final class RagConstants {
      * 检索来源：混合（向量 + 关键字）检索
      */
     public static final String RETRIEVAL_SOURCE_HYBRID = "VECTOR+KEYWORD";
+
+    /**
+     * 片段已进入最终答案上下文。
+     */
+    public static final String PIPELINE_SELECTED = "SELECTED";
+
+    /**
+     * 片段在流水线中被淘汰。
+     */
+    public static final String PIPELINE_DROPPED = "DROPPED";
 }

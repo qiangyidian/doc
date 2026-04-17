@@ -54,7 +54,9 @@ public class RetrievalEvaluationServiceImpl implements RetrievalEvaluationServic
         List<EvalCase> evalCases = loadCases();
         List<RetrievalEvalCaseResult> caseResults = new ArrayList<>();
 
+        // 用于累加每个样本的倒数排名（1/Rank），最终除以总数得到 MRR (Mean Reciprocal Rank)
         double reciprocalRankSum = 0D;
+        // 用于记录在 Top-K 结果中成功命中（找到期望文件）的样本总数
         int hitCount = 0;
 
         // 2. 遍历每个测试样本并运行检索

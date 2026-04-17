@@ -27,11 +27,22 @@ class OllamaCompatibilityConfigTest {
         assertTrue(applicationYaml.contains("vector-top-k: 6"));
         assertTrue(applicationYaml.contains("keyword-top-k: 6"));
         assertTrue(applicationYaml.contains("trgm-similarity-threshold: 0.08"));
-        assertTrue(applicationYaml.contains("fusion-top-k: 6"));
+        assertTrue(applicationYaml.contains("candidate-top-k: 8"));
         assertTrue(applicationYaml.contains("rrf-k: 60"));
         assertTrue(applicationYaml.contains("query-rewrite-enabled: true"));
         assertTrue(applicationYaml.contains("rewrite-query-count: 2"));
+        assertTrue(applicationYaml.contains("rerank:"));
+        assertTrue(applicationYaml.contains("enabled: true"));
+        assertTrue(applicationYaml.contains("top-k: 4"));
+        assertTrue(applicationYaml.contains("min-score: 55"));
+        assertTrue(applicationYaml.contains("max-content-length-per-chunk: 350"));
+        assertTrue(applicationYaml.contains("compression:"));
+        assertTrue(applicationYaml.contains("deduplicate-before-llm: true"));
+        assertTrue(applicationYaml.contains("max-chars-per-chunk: 260"));
+        assertTrue(applicationYaml.contains("max-total-context-chars: 1800"));
+        assertTrue(applicationYaml.contains("drop-empty-chunks: true"));
         assertTrue(applicationYaml.contains("case-file: retrieval-eval/tutorial-eval-cases.json"));
+        assertFalse(applicationYaml.contains("fusion-top-k:"));
     }
 
     @Test

@@ -46,9 +46,20 @@ rag:
     similarity-threshold: 0.45
     keyword-top-k: 6
     trgm-similarity-threshold: 0.08
-    fusion-top-k: 6
+    candidate-top-k: 8
     rrf-k: 60
     query-rewrite-enabled: true
     rewrite-query-count: 2
+  rerank:
+    enabled: true
+    top-k: 4
+    min-score: 55
+    max-content-length-per-chunk: 350
+  compression:
+    enabled: true
+    deduplicate-before-llm: true
+    max-chars-per-chunk: 260
+    max-total-context-chars: 1800
+    drop-empty-chunks: true
   evaluation:
     case-file: retrieval-eval/tutorial-eval-cases.json

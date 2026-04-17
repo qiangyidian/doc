@@ -36,4 +36,19 @@ public class RetrievedChunk {
      * 采用 RRF（倒数秩融合）计算的累加得分，分越高代表相关度可能越高
      */
     private Double fusionScore;
+
+    /**
+     * 第三阶段精排得分。
+     */
+    private Double rerankScore;
+
+    /**
+     * 第三阶段压缩后的内容。
+     */
+    private String compressedContent;
+
+    /**
+     * 当前片段是否最终进入答案上下文。
+     */
+    private boolean selectedForAnswer;
 }

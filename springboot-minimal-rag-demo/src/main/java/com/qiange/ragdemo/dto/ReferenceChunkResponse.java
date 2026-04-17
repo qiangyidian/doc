@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * 引用片段响应体。
+ * 第三阶段引用片段响应体。
  */
 @Data
 @Builder
@@ -43,4 +43,19 @@ public class ReferenceChunkResponse {
      * 多路召回融合或排序后的最终得分
      */
     private Double fusionScore;
+
+    /**
+     * 第三阶段精排得分。
+     */
+    private Double rerankScore;
+
+    /**
+     * 第三阶段压缩后的内容。
+     */
+    private String compressedContent;
+
+    /**
+     * 片段是否最终进入答案上下文。
+     */
+    private String finalSelectionStatus;
 }

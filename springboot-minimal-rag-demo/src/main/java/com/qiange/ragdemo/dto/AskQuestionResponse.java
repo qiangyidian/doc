@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * 第二阶段问答响应体。
+ * 第三阶段问答响应体。
  */
 @Data
 @Builder
@@ -25,6 +25,16 @@ public class AskQuestionResponse {
      * RAG 重写或扩展后的查询词列表
      */
     private List<String> rewrittenQueries;
+
+    /**
+     * 压缩前上下文总长度。
+     */
+    private Integer contextLengthBeforeCompression;
+
+    /**
+     * 压缩后上下文总长度。
+     */
+    private Integer contextLengthAfterCompression;
 
     /**
      * 生成回答所参考的知识片段列表

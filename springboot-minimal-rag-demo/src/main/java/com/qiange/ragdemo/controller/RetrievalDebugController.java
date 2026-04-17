@@ -81,6 +81,11 @@ public class RetrievalDebugController {
                 .content(document.getText())
                 .retrievalSource(chunk.getRetrievalSource())
                 .fusionScore(chunk.getFusionScore())
+                .rerankScore(chunk.getRerankScore())
+                .compressedContent(chunk.getCompressedContent())
+                .finalSelectionStatus(chunk.isSelectedForAnswer()
+                        ? RagConstants.PIPELINE_SELECTED
+                        : RagConstants.PIPELINE_DROPPED)
                 .build();
     }
 

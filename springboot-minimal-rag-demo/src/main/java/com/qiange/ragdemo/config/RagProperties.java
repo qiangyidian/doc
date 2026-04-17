@@ -4,10 +4,10 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * 第二阶段 RAG 配置绑定类。
+ * 第三阶段 RAG 配置绑定类。
  *
- * 主体结构遵循增强实现文档，
- * 仅额外保留了少量兼容字段，避免打断当前项目已经跑通的本地预热链路。
+ * 主体结构遵循精排与压缩实现文档，
+ * 同时保留启动预热所需的兼容字段，避免影响当前本地 Ollama 运行方式。
  */
 @Data
 @ConfigurationProperties(prefix = "rag")
@@ -22,6 +22,16 @@ public class RagProperties {
      * 多路检索与排序相关的配置参数集合
      */
     private Retrieval retrieval = new Retrieval();
+
+    /**
+     * 精排相关配置
+     */
+    private Rerank rerank = new Rerank();
+
+    /**
+     * 上下文压缩相关配置
+     */
+    private Compression compression = new Compression();
 
     /**
      * 评估相关的配置参数集合
@@ -99,9 +109,9 @@ public class RagProperties {
         private Double trgmSimilarityThreshold = 0.08;
 
         /**
-         * 融合后最终返回的召回数
+         * 融合后送给精排服务的候选数。
          */
-        private Integer fusionTopK = 6;
+        private Integer candidateTopK = 8;
 
         /**
          * RRF 算法的平滑常数 K
@@ -117,6 +127,59 @@ public class RagProperties {
          * 重写生成的查询词数量
          */
         private Integer rewriteQueryCount = 2;
+    }
+
+    @Data
+    public static class Rerank {
+
+        /**
+         * 是否开启精排。
+         */
+        private Boolean enabled = true;
+
+        /**
+         * 精排后保留的高质量片段数。
+         */
+        private Integer topK = 4;
+
+        /**
+         * 精排最低得分阈值。
+         */
+        private Integer minScore = 55;
+
+        /**
+         * 精排时单条片段传给模型的最大字符数。
+         */
+        private Integer maxContentLengthPerChunk = 350;
+    }
+
+    @Data
+    public static class Compression {
+
+        /**
+         * 是否开启上下文压缩。
+         */
+        private Boolean enabled = true;
+
+        /**
+         * 是否在进入 LLM 前先做规则去重。
+         */
+        private Boolean deduplicateBeforeLlm = true;
+
+        /**
+         * 单条片段压缩后的最大长度。
+         */
+        private Integer maxCharsPerChunk = 260;
+
+        /**
+         * 最终上下文总长度上限。
+         */
+        private Integer maxTotalContextChars = 1800;
+
+        /**
+         * 压缩后为空的片段是否直接丢弃。
+         */
+        private Boolean dropEmptyChunks = true;
     }
 
     @Data
